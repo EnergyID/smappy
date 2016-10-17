@@ -2,10 +2,9 @@ import requests
 import datetime as dt
 from functools import wraps
 import os
-import warnings
 
 __title__ = "smappy"
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 __author__ = "EnergieID.be"
 __license__ = "MIT"
 
@@ -62,7 +61,7 @@ class Smappee(object):
 
         Returns
         -------
-        nothing
+        requests.Response
             access token is saved in self.access_token
             refresh token is saved in self.refresh_token
             expiration time is set in self.token_expiration_time as datetime.datetime
@@ -76,12 +75,12 @@ class Smappee(object):
             "password": password
         }
         r = requests.post(url, data=data)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, data)
+        r.raise_for_status()
         j = r.json()
         self.access_token = j['access_token']
         self.refresh_token = j['refresh_token']
         self._set_token_expiration_time(expires_in=j['expires_in'])
+        return r
 
     def _set_token_expiration_time(self, expires_in):
         """
@@ -105,7 +104,7 @@ class Smappee(object):
 
         Returns
         -------
-        nothing
+        requests.Response
             access token is saved in self.access_token
             refresh token is saved in self.refresh_token
             expiration time is set in self.token_expiration_time as datetime.datetime
@@ -118,12 +117,12 @@ class Smappee(object):
             "client_secret": self.client_secret
         }
         r = requests.post(url, data=data)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, data)
+        r.raise_for_status()
         j = r.json()
         self.access_token = j['access_token']
         self.refresh_token = j['refresh_token']
         self._set_token_expiration_time(expires_in=j['expires_in'])
+        return r
 
     @authenticated
     def get_service_locations(self):
@@ -137,8 +136,7 @@ class Smappee(object):
         url = URLS['servicelocation']
         headers = {"Authorization": "Bearer {}".format(self.access_token)}
         r = requests.get(url, headers=headers)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, headers)
+        r.raise_for_status()
         return r.json()
 
     @authenticated
@@ -157,8 +155,7 @@ class Smappee(object):
         url = os.path.join(URLS['servicelocation'], str(service_location_id), "info")
         headers = {"Authorization": "Bearer {}".format(self.access_token)}
         r = requests.get(url, headers=headers)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, headers)
+        r.raise_for_status()
         return r.json()
 
     @authenticated
@@ -237,8 +234,7 @@ class Smappee(object):
             "to": end
         }
         r = requests.get(url, headers=headers, params=params)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, headers, params)
+        r.raise_for_status()
         return r.json()
 
     @authenticated
@@ -273,14 +269,12 @@ class Smappee(object):
             "maxNumber": max_number
         }
         r = requests.get(url, headers=headers, params=params)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, headers, params)
+        r.raise_for_status()
         return r.json()
 
     @authenticated
     def actuator_on(self, service_location_id, actuator_id, duration=None):
         """
-        NOT TESTED
         Turn actuator on
 
         Parameters
@@ -291,6 +285,10 @@ class Smappee(object):
             300,900,1800 or 3600 , specifying the time in seconds the actuator
             should be turned on. Any other value results in turning on for an
             undetermined period of time.
+
+        Returns
+        -------
+        requests.Response
         """
         return self._actuator_on_off(on_off='on', service_location_id=service_location_id, actuator_id=actuator_id,
                                      duration=duration)
@@ -298,7 +296,6 @@ class Smappee(object):
     @authenticated
     def actuator_off(self, service_location_id, actuator_id, duration=None):
         """
-        NOT TESTED
         Turn actuator off
 
         Parameters
@@ -309,13 +306,16 @@ class Smappee(object):
             300,900,1800 or 3600 , specifying the time in seconds the actuator
             should be turned on. Any other value results in turning on for an
             undetermined period of time.
+
+        Returns
+        -------
+        requests.Response
         """
         return self._actuator_on_off(on_off='off', service_location_id=service_location_id, actuator_id=actuator_id,
                                      duration=duration)
 
     def _actuator_on_off(self, on_off, service_location_id, actuator_id, duration=None):
         """
-        NOT TESTED
         Turn actuator on or off
 
         Parameters
@@ -328,14 +328,17 @@ class Smappee(object):
             300,900,1800 or 3600 , specifying the time in seconds the actuator
             should be turned on. Any other value results in turning on for an
             undetermined period of time.
+
+        Returns
+        -------
+        requests.Response
         """
         url = os.path.join(URLS['servicelocation'], str(service_location_id), "actuator", str(actuator_id), on_off)
         headers = {"Authorization": "Bearer {}".format(self.access_token)}
         data = {"duration": duration}
         r = requests.post(url, headers=headers, json=data)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, headers, data)
-        return
+        r.raise_for_status()
+        return r
 
     def get_consumption_dataframe(self, service_location_id, start, end, aggregation, sensor_id=None, localize=False):
         """
@@ -430,8 +433,6 @@ class LocalSmappee(object):
         ip : str
             local IP-address of your Smappee
         """
-        warnings.warn('This class is currently untested. Please report any errors on '
-                      'https://github.com/EnergyID/smappy/issues/7')
         self.ip = ip
         self.headers = {'Content-Type': 'application/json;charset=UTF-8'}
 
@@ -449,47 +450,48 @@ class LocalSmappee(object):
 
         Returns
         -------
-        str
+        dict
         """
         url = os.path.join(self.base_url, 'logon')
         data = password
 
         r = requests.post(url, data=data, headers=self.headers, timeout=5)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, self.headers, data)
-        return r.content
+        r.raise_for_status()
+        return r.json()
 
     def report_instantaneous_values(self):
         """
         Returns
         -------
-        str
+        dict
         """
         url = os.path.join(self.base_url, 'reportInstantaneousValues')
 
         r = requests.get(url, headers=self.headers, timeout=5)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, self.headers)
-        return r.content
+        r.raise_for_status()
+        return r.json()
 
     def load_instantaneous(self):
         """
         Returns
         -------
-        str
+        dict
         """
         url = os.path.join(self.base_url, 'instantaneous')
         data = "loadInstantaneous"
 
         r = requests.post(url, data=data, headers=self.headers, timeout=5)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, self.headers, data)
-        return r.content
+        r.raise_for_status()
+        return r.json()
 
     def restart(self):
+        """
+        Returns
+        -------
+        requests.Response
+        """
         url = os.path.join(self.base_url, 'restartEMeter')
 
         r = requests.post(url, headers=self.headers, timeout=5)
-        if r.status_code != 200:
-            raise requests.HTTPError(r.status_code, url, self.headers)
-        return
+        r.raise_for_status()
+        return r
