@@ -196,8 +196,8 @@ class Smappee(object):
                                      aggregation=aggregation)
 
     @authenticated
-    def get_sensor_consumption(
-            self, service_location_id, sensor_id, start, end, aggregation):
+    def get_sensor_consumption(self, service_location_id, sensor_id, start,
+                               end, aggregation):
         """
         Request consumption for a given sensor in a given service location
 
