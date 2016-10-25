@@ -1,10 +1,9 @@
 import requests
 import datetime as dt
 from functools import wraps
-import os
 
 __title__ = "smappy"
-__version__ = "0.2.7"
+__version__ = "0.2.9"
 __author__ = "EnergieID.be"
 __license__ = "MIT"
 
@@ -162,8 +161,7 @@ class Smappee(object):
         -------
         dict
         """
-        url = os.path.join(
-            URLS['servicelocation'], str(service_location_id), "info")
+        url = urljoin(URLS['servicelocation'], service_location_id, "info")
         headers = {"Authorization": "Bearer {}".format(self.access_token)}
         r = requests.get(url, headers=headers)
         r.raise_for_status()
@@ -192,10 +190,10 @@ class Smappee(object):
         -------
         dict
         """
-        url = os.path.join(
-            URLS['servicelocation'], str(service_location_id), "consumption")
-        return self._get_consumption(
-            url=url, start=start, end=end, aggregation=aggregation)
+        url = urljoin(URLS['servicelocation'], service_location_id,
+                      "consumption")
+        return self._get_consumption(url=url, start=start, end=end,
+                                     aggregation=aggregation)
 
     @authenticated
     def get_sensor_consumption(
@@ -221,11 +219,10 @@ class Smappee(object):
         -------
         dict
         """
-        url = os.path.join(
-            URLS['servicelocation'], str(
-                service_location_id), "sensor", str(sensor_id), "consumption")
-        return self._get_consumption(
-            url=url, start=start, end=end, aggregation=aggregation)
+        url = urljoin(URLS['servicelocation'], service_location_id, "sensor",
+                      sensor_id, "consumption")
+        return self._get_consumption(url=url, start=start, end=end,
+                                     aggregation=aggregation)
 
     def _get_consumption(self, url, start, end, aggregation):
         """
@@ -281,8 +278,7 @@ class Smappee(object):
         start = self._to_milliseconds(start)
         end = self._to_milliseconds(end)
 
-        url = os.path.join(
-            URLS['servicelocation'], str(service_location_id), "events")
+        url = urljoin(URLS['servicelocation'], service_location_id, "events")
         headers = {"Authorization": "Bearer {}".format(self.access_token)}
         params = {
             "from": start,
@@ -338,8 +334,8 @@ class Smappee(object):
             on_off='off', service_location_id=service_location_id,
             actuator_id=actuator_id, duration=duration)
 
-    def _actuator_on_off(
-            self, on_off, service_location_id, actuator_id, duration=None):
+    def _actuator_on_off(self, on_off, service_location_id, actuator_id,
+                         duration=None):
         """
         Turn actuator on or off
 
@@ -358,18 +354,16 @@ class Smappee(object):
         -------
         requests.Response
         """
-        url = os.path.join(
-            URLS['servicelocation'], str(
-                service_location_id), "actuator", str(actuator_id), on_off)
+        url = urljoin(URLS['servicelocation'], service_location_id,
+                      "actuator", actuator_id, on_off)
         headers = {"Authorization": "Bearer {}".format(self.access_token)}
         data = {"duration": duration}
         r = requests.post(url, headers=headers, json=data)
         r.raise_for_status()
         return r
 
-    def get_consumption_dataframe(
-            self, service_location_id, start, end, aggregation, sensor_id=None,
-            localize=False):
+    def get_consumption_dataframe(self, service_location_id, start, end,
+                                  aggregation, sensor_id=None, localize=False):
         """
         Extends get_consumption() AND get_sensor_consumption(),
         parses the results in a Pandas DataFrame
@@ -406,7 +400,8 @@ class Smappee(object):
             data = self.get_sensor_consumption(
                 service_location_id=service_location_id, sensor_id=sensor_id,
                 start=start, end=end, aggregation=aggregation)
-    # yeah please someone explain me why they had to name this differently...
+            # yeah please someone explain me why they had to name this
+            # differently...
             consumptions = data['records']
 
         df = pd.DataFrame.from_dict(consumptions)
@@ -477,7 +472,7 @@ class LocalSmappee(object):
 
     @property
     def base_url(self):
-        url = os.path.join('http://', self.ip, 'gateway', 'apipublic')
+        url = urljoin('http://', self.ip, 'gateway', 'apipublic')
         return url
 
     def logon(self, password='admin'):
@@ -491,7 +486,7 @@ class LocalSmappee(object):
         -------
         dict
         """
-        url = os.path.join(self.base_url, 'logon')
+        url = urljoin(self.base_url, 'logon')
         data = password
 
         r = requests.post(url, data=data, headers=self.headers, timeout=5)
@@ -504,7 +499,7 @@ class LocalSmappee(object):
         -------
         dict
         """
-        url = os.path.join(self.base_url, 'reportInstantaneousValues')
+        url = urljoin(self.base_url, 'reportInstantaneousValues')
 
         r = requests.get(url, headers=self.headers, timeout=5)
         r.raise_for_status()
@@ -516,7 +511,7 @@ class LocalSmappee(object):
         -------
         dict
         """
-        url = os.path.join(self.base_url, 'instantaneous')
+        url = urljoin(self.base_url, 'instantaneous')
         data = "loadInstantaneous"
 
         r = requests.post(url, data=data, headers=self.headers, timeout=5)
@@ -529,8 +524,35 @@ class LocalSmappee(object):
         -------
         requests.Response
         """
-        url = os.path.join(self.base_url, 'restartEMeter')
+        url = urljoin(self.base_url, 'restartEMeter')
 
         r = requests.post(url, headers=self.headers, timeout=5)
         r.raise_for_status()
         return r
+
+
+def urljoin(*parts):
+    """
+    Join terms together with forward slashes
+
+    Parameters
+    ----------
+    parts
+
+    Returns
+    -------
+    str
+    """
+    # first strip extra forward slashes (except http:// and the likes) and
+    # create list
+    part_list = []
+    for part in parts:
+        p = str(part)
+        if p.endswith('//'):
+            p = p[0:-1]
+        else:
+            p = p.strip('/')
+        part_list.append(p)
+    # join everything together
+    url = '/'.join(part_list)
+    return url
